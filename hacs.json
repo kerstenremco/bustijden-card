@@ -1,0 +1,8 @@
+{
+  "name": "Bustijden Card",
+  "content_in_root": true,
+  "filename": "card.js",
+  "domains": ["bustijden"],
+  "country": "NL",
+  "render_readme": true
+}
