@@ -741,6 +741,10 @@ class $2388023d729b4380$export$5365bfeef88eca6f extends (0, $bef0b097a0201904$ex
             _hass: {
                 type: Object
             },
+            valid_entity: {
+                type: Boolean,
+                state: true
+            },
             stop_name: {
                 type: String,
                 state: true
@@ -757,24 +761,62 @@ class $2388023d729b4380$export$5365bfeef88eca6f extends (0, $bef0b097a0201904$ex
     }
     constructor(){
         super();
+        this.stops = [];
+        this.available = false;
+        this.valid_entity = false;
+    }
+    static getStubConfig(hass) {
+        const firstSensor = Object.keys(hass.entities).find((entityId)=>entityId.startsWith("sensor.bus_stop_"));
+        return {
+            entity: firstSensor || ""
+        };
     }
     setConfig(config) {
         this.entity = config.entity;
     }
     set hass(hass) {
-        console.log(hass["states"]?.[this.entity]);
         this._hass = hass;
-        this.stop_name = hass["states"]?.[this.entity]?.["attributes"]["friendly_name"];
-        this.stops = hass["states"]?.[this.entity]?.["attributes"]["stops"];
-        this.available = hass["states"]?.[this.entity]?.["state"] != "unavailable" || false;
-        this.lastUpdated = hass["states"]?.[this.entity]?.["last_updated"];
+        // Validate entity
+        this.valid_entity = this.entity.includes("bus_stop_");
+        if (!this.valid_entity) return;
+        // Get state attributes
+        const state = hass["states"]?.[this.entity];
+        if (!state) return;
+        this.stop_name = state["attributes"]["friendly_name"];
+        this.stops = state["attributes"]["stops"];
+        this.lastUpdated = state["last_updated"];
+        // Check availability
+        this.available = state["state"] != "unavailable";
+    }
+    static getConfigForm() {
+        return {
+            schema: [
+                {
+                    name: "entity",
+                    required: true,
+                    selector: {
+                        entity: {
+                            domain: "sensor"
+                        }
+                    }
+                }
+            ]
+        };
     }
     stripTime(timeString) {
         return timeString.split(":").slice(0, 2).join(":");
     }
     render() {
+        if (!this.valid_entity) return (0, $ad0512c2874d4e1a$export$c0bb0b647f701bb5)`<div>
+        Ongeldige entity. Zorg ervoor dat je een sensor met het juiste formaat
+        gebruikt.
+      </div>`;
         if (this.available === false) return (0, $ad0512c2874d4e1a$export$c0bb0b647f701bb5)`<div>
         Geen busgegevens beschikbaar. Controleer je internetverbinding.
+      </div>`;
+        if (!this.stop_name) return (0, $ad0512c2874d4e1a$export$c0bb0b647f701bb5)`<div>
+        Halte naam niet beschikbaar. Controleer of de haltecode goed in je
+        configuratie staat.
       </div>`;
         if (this.stop_name.endsWith("None")) return (0, $ad0512c2874d4e1a$export$c0bb0b647f701bb5)`<div>
         Deze halte is niet gevonden. Controleer of de haltecode goed in je
@@ -820,5 +862,11 @@ class $2388023d729b4380$export$5365bfeef88eca6f extends (0, $bef0b097a0201904$ex
 
 
 customElements.define("bustijden-card", (0, $2388023d729b4380$export$5365bfeef88eca6f));
+window.customCards = window.customCards || [];
+window.customCards.push({
+    type: "bustijden-card",
+    name: "Bustijden Card",
+    description: "Shows upcoming bus departures"
+});
 
 

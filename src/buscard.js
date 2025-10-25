@@ -9,6 +9,7 @@ export class BustijdenCard extends LitElement {
       stops: { type: Array, state: true },
       entity: { type: String },
       _hass: { type: Object },
+      valid_entity: { type: Boolean, state: true },
       stop_name: { type: String, state: true },
       available: { type: Boolean, state: true },
       lastUpdated: { type: String, state: true },
@@ -17,6 +18,18 @@ export class BustijdenCard extends LitElement {
 
   constructor() {
     super();
+    this.stops = [];
+    this.available = false;
+    this.valid_entity = false;
+  }
+
+  static getStubConfig(hass) {
+    const firstSensor = Object.keys(hass.entities).find((entityId) =>
+      entityId.startsWith("sensor.bus_stop_")
+    );
+    return {
+      entity: firstSensor || "",
+    };
   }
 
   setConfig(config) {
@@ -24,14 +37,35 @@ export class BustijdenCard extends LitElement {
   }
 
   set hass(hass) {
-    console.log(hass["states"]?.[this.entity]);
     this._hass = hass;
-    this.stop_name =
-      hass["states"]?.[this.entity]?.["attributes"]["friendly_name"];
-    this.stops = hass["states"]?.[this.entity]?.["attributes"]["stops"];
-    this.available =
-      hass["states"]?.[this.entity]?.["state"] != "unavailable" || false;
-    this.lastUpdated = hass["states"]?.[this.entity]?.["last_updated"];
+    // Validate entity
+    this.valid_entity = this.entity.includes("bus_stop_");
+    if (!this.valid_entity) {
+      return;
+    }
+    // Get state attributes
+    const state = hass["states"]?.[this.entity];
+    if (!state) {
+      return;
+    }
+    this.stop_name = state["attributes"]["friendly_name"];
+    this.stops = state["attributes"]["stops"];
+    this.lastUpdated = state["last_updated"];
+
+    // Check availability
+    this.available = state["state"] != "unavailable";
+  }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        {
+          name: "entity",
+          required: true,
+          selector: { entity: { domain: "sensor" } },
+        },
+      ],
+    };
   }
 
   stripTime(timeString) {
@@ -39,11 +73,26 @@ export class BustijdenCard extends LitElement {
   }
 
   render() {
+    if (!this.valid_entity) {
+      return html`<div>
+        Ongeldige entity. Zorg ervoor dat je een sensor met het juiste formaat
+        gebruikt.
+      </div>`;
+    }
+
     if (this.available === false) {
       return html`<div>
         Geen busgegevens beschikbaar. Controleer je internetverbinding.
       </div>`;
     }
+
+    if (!this.stop_name) {
+      return html`<div>
+        Halte naam niet beschikbaar. Controleer of de haltecode goed in je
+        configuratie staat.
+      </div>`;
+    }
+
     if (this.stop_name.endsWith("None")) {
       return html`<div>
         Deze halte is niet gevonden. Controleer of de haltecode goed in je
