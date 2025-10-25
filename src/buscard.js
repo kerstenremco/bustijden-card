@@ -1,113 +1,94 @@
 import { html, LitElement } from "lit";
-import { styles, liveIcon } from "./buscard.styles";
+import { styles, timeIcon } from "./buscard.styles.js";
 
-export class ToggleCardLit extends LitElement {
-  // private property
-  _hass;
+export class BustijdenCard extends LitElement {
+  static styles = styles;
 
-  // internal reactive states
   static get properties() {
     return {
-      _entity: { state: true },
-      _state: { state: true },
+      stops: { type: Array, state: true },
+      entity: { type: String },
+      _hass: { type: Object },
+      stop_name: { type: String, state: true },
+      available: { type: Boolean, state: true },
+      lastUpdated: { type: String, state: true },
     };
   }
 
-  // lifecycle interface
-  setConfig(config) {
-    this._entity = config.entity;
-    // call set hass() to immediately adjust to a changed entity
-    // while editing the entity in the card editor
-    if (this._hass) {
-      this.hass = this._hass;
-    }
+  constructor() {
+    super();
   }
 
-  getStops() {
-    return this._state?.attributes?.stops || [];
+  setConfig(config) {
+    this.entity = config.entity;
   }
 
   set hass(hass) {
+    console.log(hass["states"]?.[this.entity]);
     this._hass = hass;
-    this._state = hass.states[this._entity];
+    this.stop_name =
+      hass["states"]?.[this.entity]?.["attributes"]["friendly_name"];
+    this.stops = hass["states"]?.[this.entity]?.["attributes"]["stops"];
+    this.available =
+      hass["states"]?.[this.entity]?.["state"] != "unavailable" || false;
+    this.lastUpdated = hass["states"]?.[this.entity]?.["last_updated"];
   }
 
-  static styles = styles;
-
-  convertArrivalTime(arrivalTime) {
-    return arrivalTime.split(":").splice(0, 2).join(":");
-  }
-
-  // Show arrival time. If delayed or canceled, show original time with strikethrough.
-  getArrivalTime(bus) {
-    let text = "";
-    let className = "";
-    if (bus.delayInSeconds > 0) {
-      text = this.convertArrivalTime(bus.arrivalTime);
-    } else if (bus.canceled) {
-      text = this.convertArrivalTime(bus.arrivalTime);
-      className += " route-time-delay";
-    } else {
-      text = this.convertArrivalTime(bus.calculatedArrivalTime);
-    }
-    return html`<span class="${className}">${text}</span>`;
-  }
-
-  // If delay, show new time. If canceled, show "GEANNULEERD".
-  getExtraTimeInfo(bus) {
-    let text = "";
-    let className = "";
-    if (bus.canceled) {
-      text = "GEANNULEERD";
-      className += " route-extra-time-canceled";
-    } else if (bus.delayInSeconds > 0) {
-      text = this.convertArrivalTime(bus.calculatedArrivalTime);
-    }
-    return html`<span class="${className}">${text}</span>`;
-  }
-
-  getMinutesUntil(bus) {
-    let className = "";
-    if (bus.canceled) {
-      className = "bus-timer-canceled";
-    } else {
-      className = "bus-timer";
-    }
-    return html`<span class="${className}">${bus.minutesUntil} min</span>`;
-  }
-
-  getBusCards() {
-    const cards = [];
-    const stops = this.getStops();
-    stops.forEach((bus) => {
-      cards.push(html`
-        <div class="buscard">
-          <div class="buscard-header">
-            <span class="bus-number">${bus.routeShortName}</span>
-            <span class="bus-title">${bus.stopHeadsign}</span>
-            ${this.getMinutesUntil(bus)} ${liveIcon}
-          </div>
-          <div class="buscard-time">
-            <div class="buscard-time-details">
-              <div class="route">
-                <div class="route-time">
-                  ${this.getArrivalTime(bus)} ${this.getExtraTimeInfo(bus)}
-                </div>
-                <div class="route-station">${bus.routeLongName}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      `);
-    });
-    return cards;
+  stripTime(timeString) {
+    return timeString.split(":").slice(0, 2).join(":");
   }
 
   render() {
+    if (this.available === false) {
+      return html`<div>
+        Geen busgegevens beschikbaar. Controleer je internetverbinding.
+      </div>`;
+    }
+    if (this.stop_name.endsWith("None")) {
+      return html`<div>
+        Deze halte is niet gevonden. Controleer of de haltecode goed in je
+        configuratie staat.
+      </div>`;
+    }
+    if (!this.stops || this.stops.length === 0) {
+      return html`<div>
+        Er zijn momenteel geen aankomende bussen voor deze halte.
+      </div>`;
+    }
     return html`
-      <ha-card>
-        <div class="card-content">${this.getBusCards()}</div>
-      </ha-card>
+      <div>
+        ${this.stops.map((stop) => {
+          let className = "bus-card";
+          if (stop.canceled) {
+            className += " canceled";
+          } else if (stop.delayInSeconds > 0) {
+            className += " changed";
+          }
+          return html`
+            <div class="${className}">
+              <div class="bus-card-head">
+                <span class="line-number">${stop.routeShortName}</span>
+
+                <div class="bus-card-details">
+                  <span class="bus-time"
+                    >${this.stripTime(stop.arrivalTime)}</span
+                  >
+                  <span class="bus-time-changed"
+                    >${this.stripTime(stop.calculatedArrivalTime)}</span
+                  >
+                  <span class="bus-time-canceled">Geannuleerd</span>
+                  <span class="stop-text">${stop.tripHeadsign}</span>
+                  <div class="bus-card-details-time">
+                    <span class="bus-direction">${stop.routeLongName}</span>
+                  </div>
+                </div>
+                <span class="live-time">${stop.minutesUntil} min</span>
+                ${timeIcon}
+              </div>
+            </div>
+          `;
+        })}
+      </div>
     `;
   }
 }

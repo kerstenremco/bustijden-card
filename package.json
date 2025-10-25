@@ -6,8 +6,8 @@
     }
   },
   "scripts": {
-    "watch": "parcel watch --dist-dir .",
-    "build": "parcel build --dist-dir ."
+    "watch": "parcel watch --dist-dir . --no-source-maps",
+    "build": "parcel build --dist-dir . --no-source-maps"
   },
   "devDependencies": {
     "parcel": "^2.15.4"

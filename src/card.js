@@ -1,3 +1,3 @@
-import { ToggleCardLit } from "./buscard";
+import { BustijdenCard } from "./buscard";
 
-customElements.define("bustijden-card", ToggleCardLit);
+customElements.define("bustijden-card", BustijdenCard);
